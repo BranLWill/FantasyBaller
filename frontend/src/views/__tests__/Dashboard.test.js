@@ -1,5 +1,5 @@
 import React from "react";
-import { ExternalApiComponent } from "../ExternalApi";
+import { ExternalApiComponent } from "../Dashboard";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/extend-expect";
 import { useAuth0 } from "@auth0/auth0-react";
@@ -8,7 +8,7 @@ import { getConfig } from "../../config";
 jest.mock("../../config");
 jest.mock("@auth0/auth0-react");
 
-describe("The ExternalApi component", () => {
+describe("The Dashboard component", () => {
   beforeEach(() => {
     fetch.resetMocks();
 
@@ -52,7 +52,7 @@ describe("The ExternalApi component", () => {
     getConfig.mockReturnValue(() => ({
       domain: "test-domain.com",
       clientId: "123",
-      apiOrigin: "http://localhost:3001",
+      apiOrigin: "http://127.0.0.1:5000",
     }));
 
     render(<ExternalApiComponent />);

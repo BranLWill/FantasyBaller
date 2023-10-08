@@ -1,0 +1,6 @@
+flask
+nfl_data_py
+matplotlib
+pandas
+datetime
+Authlib

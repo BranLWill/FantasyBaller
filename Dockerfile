@@ -37,13 +37,13 @@ RUN yarn install --production
 COPY --from=build /app/build ./build
 COPY --from=build /app/src/auth_config.json ./src/auth_config.json
 COPY --from=build /app/server.js .
-COPY --from=build /app/api-server.js .
+COPY --from=build /app/backend/server.py .
 
 EXPOSE 3000
-EXPOSE 3001
+EXPOSE 5000
 
 ENV SERVER_PORT=3000
-ENV API_PORT=3001
+ENV API_PORT=5000
 ENV NODE_ENV production
 
 CMD ["yarn", "prod"]

@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { Button, Alert } from "reactstrap";
-import Highlight from "../components/Highlight";
 import { useAuth0, withAuthenticationRequired } from "@auth0/auth0-react";
 import { getConfig } from "../config";
 import Loading from "../components/Loading";
+import Card from "../components/Card";
 
 export const ExternalApiComponent = () => {
-  const { apiOrigin = "http://localhost:3001", audience } = getConfig();
+  const { apiOrigin = "http://127.0.0.1:5000", audience } = getConfig();
 
   const [state, setState] = useState({
     showResult: false,
@@ -55,16 +55,23 @@ export const ExternalApiComponent = () => {
   };
 
   const callApi = async () => {
+    console.log("PRESSED DA BUTTON")
+
     try {
       const token = await getAccessTokenSilently();
 
-      const response = await fetch(`${apiOrigin}/api/external`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${apiOrigin}/api/players/cards`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
+      console.log(response.ok)
       const responseData = await response.json();
+      console.log(responseData)
 
       setState({
         ...state,
@@ -113,17 +120,7 @@ export const ExternalApiComponent = () => {
           </Alert>
         )}
 
-        <h1>External API</h1>
-        <p className="lead">
-          Ping an external API by clicking the button below.
-        </p>
-
-        <p>
-          This will call a local API on port 3001 that would have been started
-          if you run <code>npm run dev</code>. An access token is sent as part
-          of the request's `Authorization` header and the API will validate it
-          using the API's audience value.
-        </p>
+        <h1>Player Portal</h1>
 
         {!audience && (
           <Alert color="warning">
@@ -177,19 +174,20 @@ export const ExternalApiComponent = () => {
           onClick={callApi}
           disabled={!audience}
         >
-          Ping API
+          Get Cards
         </Button>
       </div>
 
-      <div className="result-block-container">
-        {state.showResult && (
-          <div className="result-block" data-testid="api-result">
-            <h6 className="muted">Result</h6>
-            <Highlight>
-              <span>{JSON.stringify(state.apiMessage, null, 2)}</span>
-            </Highlight>
-          </div>
-        )}
+      <div className="card-area" style={{ display: "flex", flexWrap: "wrap", gap: "25px", paddingTop: "50px", paddingRight: "50px", paddingBottom: "50px", paddingLeft: "50px" }}>
+        {Object.entries(state.apiMessage).map(([key, value]) => {
+          return (
+            <Card
+              name={value.display_name}
+              headshot={value.headshot_url}
+              // borderColor={"red"}
+            />
+          );
+        })}
       </div>
     </>
   );
