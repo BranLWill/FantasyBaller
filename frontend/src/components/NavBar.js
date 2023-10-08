@@ -40,8 +40,8 @@ const NavBar = () => {
   return (
     <div className="nav-container">
       <Navbar color="light" light expand="md" container={false}>
-        <Container>
-          <NavbarBrand className="logo" />
+        <Container style={{ gap: "20px" }}>
+          <img src="http://127.0.0.1:5000/api/images/logo" />
           <NavbarToggler onClick={toggle} />
           <Collapse isOpen={isOpen} navbar>
             <Nav className="mr-auto" navbar>

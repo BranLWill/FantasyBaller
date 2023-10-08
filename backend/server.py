@@ -1,6 +1,6 @@
 """Python Flask API Auth0 integration example
 """
-from flask import Flask
+from flask import Flask, send_file
 import datetime
 import pandas as pd
 import nfl_data_py as nfl
@@ -11,6 +11,7 @@ from authlib.integrations.flask_oauth2 import ResourceProtector
 from validator import Auth0JWTBearerTokenValidator
 
 x = datetime.datetime.now()
+MAX_CARD_COUNT = 9
 
 require_auth = ResourceProtector()
 validator = Auth0JWTBearerTokenValidator(
@@ -73,17 +74,30 @@ def get_all_current_teams(team_code: str):
     except:
         abort(400)
 
-# GET all players
-@APP.route('/api/players/<string:data_type>')
+# GET all players stats
+@APP.route('/api/players/stats')
 @require_auth(None)
-def get_all_current_players_stats(data_type: str):
+def get_all_current_players_stats():
+    try:
+        result = get_all_current_players()
+
+        if result is None:
+            abort(404)
+
+        return result
+    
+    except Exception as ex:
+        print(ex)
+        abort(400)
+    
+# GET all players cards
+@APP.route('/api/players/cards')
+@require_auth(None)
+def get_all_current_players_cards():
     try:
         result = None
-
-        if data_type.lower() == "stats":
-            result = get_all_current_players()
-        elif data_type.lower() == "cards":
-            result = get_all_current_player_cards()
+        page_num = int(request.args.get("page_num", "1"))
+        result = get_all_current_player_cards(page_num-1)
 
         if result is None:
             abort(404)
@@ -143,6 +157,15 @@ def get_team_weekly_stats(team_code: str, year: str, stat_type: str):
             'success': True,
             'player': result
         })
+
+    except:
+        abort(400)
+
+@APP.route('/api/images/logo')
+def get_logo():
+    try:
+        filename = "../frontend/src/assets/brand_logo.svg"
+        return send_file(filename, mimetype='image/svg+xml')
 
     except:
         abort(400)
@@ -217,7 +240,7 @@ def get_all_current_players() -> dict:
 
     return final #{"Justin Fields": final.get("Justin Fields")}
 
-def get_all_current_player_cards() -> dict:
+def get_all_current_player_cards(page_num: int = 0) -> dict:
     player_headshots = nfl.import_weekly_rosters(years=[get_this_year()])[['player_name', 'headshot_url']]
     player_info = nfl.import_players()
     player_info.rename(columns={'gsis_id': 'player_id'}, inplace=True)
@@ -225,7 +248,9 @@ def get_all_current_player_cards() -> dict:
 
     #list(player_info[player_info['status'] != 'RET']['display_name'])
     players_df = player_info.query("status=='ACT' | status=='RES'")
-    # players_df = players_df.head(9)
+    start_index = MAX_CARD_COUNT * page_num
+    last_index = start_index + MAX_CARD_COUNT if start_index else MAX_CARD_COUNT
+    players_df = players_df.iloc[start_index:last_index]
 
     final = {}
     for _, row in players_df.iterrows():
@@ -245,6 +270,15 @@ def get_player_headshot(player_name: str, player_headshots):
         return "https://a.espncdn.com/combiner/i?img=/games/lm-static/ffl/images/nomug.png&w=426&h=320&cb=1"
 
     return list(player_info['headshot_url'])[-1]
+
+def get_max_pages() -> int:
+    player_info = nfl.import_players()
+    player_info.rename(columns={'gsis_id': 'player_id'}, inplace=True)
+    player_info = player_info[['player_id', 'display_name', 'status_short_description', 'status']]
+
+    #list(player_info[player_info['status'] != 'RET']['display_name'])
+    players_df = player_info.query("status=='ACT' | status=='RES'")
+    return int(len(players_df['display_name'].unique().tolist()) / MAX_CARD_COUNT) + 2
 
 @APP.errorhandler(400)
 def bad_request_error(error):
