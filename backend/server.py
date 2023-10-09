@@ -1,17 +1,13 @@
 """Python Flask API Auth0 integration example
 """
-from flask import Flask, send_file
 import datetime
 import pandas as pd
 import nfl_data_py as nfl
 
-from flask import Flask, request, abort, jsonify
+from flask import Flask, Response, request, abort, jsonify, send_file
 from flask_cors import CORS
 from authlib.integrations.flask_oauth2 import ResourceProtector
 from validator import Auth0JWTBearerTokenValidator
-
-x = datetime.datetime.now()
-MAX_CARD_COUNT = 9
 
 require_auth = ResourceProtector()
 validator = Auth0JWTBearerTokenValidator(
@@ -20,306 +16,301 @@ validator = Auth0JWTBearerTokenValidator(
 )
 require_auth.register_token_validator(validator)
 
-APP = Flask(__name__)
-CORS(APP, resources={r"/*": {"origins": "http://localhost:3000"}})
+class EndpointAction(object):
 
-@APP.route("/api/private-scoped")
-@require_auth("read:messages")
-def private_scoped():
-    """A valid access token and scope are required."""
-    response = (
-        "Hello from a private endpoint! You need to be"
-        " authenticated and have a scope of read:messages to see"
-        " this."
-    )
-    return jsonify(message=response)
+    def __init__(self, action):
+        self.action = action
+        self.response = Response(status=200, headers={})
 
-# Route for seeing data
-@APP.route('/api/data')
-@require_auth(None)
-def get_time():
-    return {
-        "geek": {
-            'Name': "geek",
-            'Age': "22",
-            'Date': x,
-            'Programming': "Python",
-            "TEST": "IDK"
-        },
-    }
+    def __call__(self, *args):
+        self.action()
+        return self.response
 
-# GET all team info
-@APP.route('/api/teams/<string:team_code>', methods=['GET'])
-@require_auth(None)
-def get_all_current_teams(team_code: str):
-    try:
-        result = None
 
-        if team_code.lower() == "all":
-            result = nfl.import_team_desc()
-            result = result.to_dict()
-        else:
-            result = nfl.import_team_desc()
-            result = result[result['team_abbr'] == team_code]
-            result = result.to_dict()
+class RestAPI(object):
+    app = None
 
-        if result is None:
-            abort(404)
+    def __init__(self, name):
+        self.max_card_count = 9
+        self.current_time = datetime.datetime.now()
+        self.player_headshots = nfl.import_weekly_rosters(years=[self.get_this_year()])[['player_name', 'headshot_url']]
+        self.player_card_df = self.get_all_current_player_cards_df()
 
-        return jsonify({
-            'success': True,
-            'teams': result
-        })
+        self.app = Flask(name)
+        CORS(self.app, resources={r"/*": {"origins": "http://localhost:3000"}})
 
-    except:
-        abort(400)
+        self.add_endpoint(
+            endpoint='/api/teams/<string:team_code>',
+            endpoint_name='get_team',
+            handler=self.get_team
+        )
+        self.add_endpoint(
+            endpoint='/api/players/stats',
+            endpoint_name='get_all_players_stats',
+            handler=self.get_all_players_stats
+        )
+        self.add_endpoint(
+            endpoint='/api/players/cards',
+            endpoint_name='get_all_player_cards',
+            handler=self.get_all_player_cards
+        )
+        self.add_endpoint(
+            endpoint='/api/players/<string:player_name>/<string:year>/<string:stat_type>',
+            endpoint_name='get_player_stats',
+            handler=self.get_player_stats
+        )
+        self.add_endpoint(
+            endpoint='/api/players/<string:team_code>/<string:year>/<string:stat_type>',
+            endpoint_name='get_team_weekly_stats',
+            handler=self.get_team_weekly_stats
+        )
+        self.add_endpoint(
+            endpoint='/api/images/logo',
+            endpoint_name='get_logo',
+            handler=self.get_logo
+        )
 
-# GET all players stats
-@APP.route('/api/players/stats')
-@require_auth(None)
-def get_all_current_players_stats():
-    try:
-        result = get_all_current_players()
+    def run(self, **kwargs):
+        self.app.run(**kwargs)
 
-        if result is None:
-            abort(404)
+    def add_endpoint(self, endpoint=None, endpoint_name=None, handler=None):
+        self.app.add_url_rule(endpoint, endpoint_name, view_func=handler)
 
-        return result
-    
-    except Exception as ex:
-        print(ex)
-        abort(400)
-    
-# GET all players cards
-@APP.route('/api/players/cards')
-@require_auth(None)
-def get_all_current_players_cards():
-    try:
-        result = None
-        page_num = int(request.args.get("page_num", "1"))
-        result = get_all_current_player_cards(page_num-1)
+    # GET all team info
+    @require_auth(None)
+    def get_team(self, team_code: str):
+        try:
+            result = None
 
-        if result is None:
-            abort(404)
+            if team_code.lower() == "all":
+                result = nfl.import_team_desc()
+                result = result.to_dict()
+            else:
+                result = nfl.import_team_desc()
+                result = result[result['team_abbr'] == team_code]
+                result = result.to_dict()
 
-        return result
+            if result is None:
+                abort(404)
 
-    except Exception as ex:
-        print(ex)
-        abort(400)
+            return jsonify({
+                'success': True,
+                'teams': result
+            })
 
-# GET player by name for a stat type and a certain year
-@APP.route('/api/players/<string:player_name>/<string:year>/<string:stat_type>', methods=['GET'])
-@require_auth(None)
-def get_player_stats(player_name: str, year: str, stat_type: str):
-    try:
-        result = None
+        except:
+            abort(400)
 
-        if year.lower() == "all":
-            years = get_all_years()
-        else:
-            years = [year]
+    # GET all players stats
+    @require_auth(None)
+    def get_all_players_stats(self):
+        try:
+            result = self.get_all_current_players()
 
-        if stat_type.lower() == "weekly":
-            result = get_player_weekly_stats(player_name, years)
-        elif stat_type.lower() == "season":
-            result = get_player_season_stats(player_name, years)
+            if result is None:
+                abort(404)
 
-        if result is None:
-            abort(404)
+            return result
+        
+        except Exception as ex:
+            print(ex)
+            abort(400)
+        
+    # GET all players cards
+    @require_auth(None)
+    def get_all_player_cards(self):
+        try:
+            result = None
+            page_num = int(request.args.get("page_num", "1"))
+            result = self.get_all_current_player_cards(page_num-1)
 
-        return jsonify({
-            'success': True,
-            'player': result
-        })
+            if result is None:
+                abort(404)
 
-    except:
-        abort(400)
+            return result
 
-@APP.route('/api/players/<string:team_code>/<string:year>/<string:stat_type>', methods=['GET'])
-@require_auth(None)
-def get_team_weekly_stats(team_code: str, year: str, stat_type: str):
-    try:
-        result = None
+        except Exception as ex:
+            print(ex)
+            abort(400)
 
-        if year.lower() == "all":
-            years = get_all_years()
-        else:
-            years = [year]
+    # GET player by name for a stat type and a certain year
+    @require_auth(None)
+    def get_player_stats(self, player_name: str, year: str, stat_type: str):
+        try:
+            result = None
 
-        if stat_type.lower() == "weekly":
-            result = get_team_weekly(team_code, years)
+            if year.lower() == "all":
+                years = self.get_all_years()
+            else:
+                years = [year]
 
-        if result is None:
-            abort(404)
+            if stat_type.lower() == "weekly":
+                result = self.get_player_weekly_stats(player_name, years)
+            elif stat_type.lower() == "season":
+                result = self.get_player_season_stats(player_name, years)
 
-        return jsonify({
-            'success': True,
-            'player': result
-        })
+            if result is None:
+                abort(404)
 
-    except:
-        abort(400)
+            return jsonify({
+                'success': True,
+                'player': result
+            })
 
-@APP.route('/api/images/logo')
-def get_logo():
-    try:
-        filename = "../frontend/src/assets/brand_logo.svg"
-        return send_file(filename, mimetype='image/svg+xml')
+        except:
+            abort(400)
 
-    except:
-        abort(400)
+    @require_auth(None)
+    def get_team_weekly_stats(self, team_code: str, year: str, stat_type: str):
+        try:
+            result = None
 
-def get_all_years() -> list:
-    results = []
-    for i in range(1999, get_this_year() + 1):
-        results.append(i)
+            if year.lower() == "all":
+                years = self.get_all_years()
+            else:
+                years = [year]
 
-    return results
+            if stat_type.lower() == "weekly":
+                result = self.get_team_weekly(team_code, years)
 
-def get_this_year() -> int:
-    return int(datetime.datetime.now().date().strftime("%Y"))
+            if result is None:
+                abort(404)
 
-def get_player_season_stats(player_name: str, years: list):
-    
-    if len(years) == 0:
-        years = get_this_year()
-    
-    season_stats = nfl.import_seasonal_data(years=years)
-    player_info = nfl.import_players()
-    player_info = player_info[player_info['display_name'] == player_name]
-    result = season_stats[season_stats['player_id']
-                            == player_info['gsis_id'].tolist()[0]]
-    result.insert(loc=1, column='player_name',
-                    value=[player_name]*len(result))
-    
-    return result.to_dict()
+            return jsonify({
+                'success': True,
+                'player': result
+            })
 
-def get_player_weekly_stats(player_name: str, years: list):
+        except:
+            abort(400)
 
-    if len(years) == 0:
-        years = get_this_year()
+    def get_logo(self):
+        try:
+            filename = "../frontend/src/assets/brand_logo.svg"
+            return send_file(filename, mimetype='image/svg+xml')
 
-    result = nfl.import_weekly_data(years)
-    result.fillna(0.0, inplace=True)
+        except:
+            abort(400)
 
-    return result.query(f"player_display_name=='{player_name}'").to_dict()
+    def get_all_years(self) -> list:
+        results = []
+        for i in range(1999, self.get_this_year() + 1):
+            results.append(i)
 
-def get_team_weekly(team_code: str, years: list):
-    
-    if len(years) == 0:
-        years = get_this_year()
+        return results
 
-    result = nfl.import_weekly_data(years)
-    result.fillna(0.0, inplace=True)
-    return result.query(f"recent_team=='{team_code}'").to_dict()
+    def get_this_year(self) -> int:
+        return int(self.current_time.date().strftime("%Y"))
 
-def get_all_current_players() -> dict:
-    player_headshots = nfl.import_weekly_data(years=[get_this_year()])[['player_display_name', 'headshot_url']]
-    season_data = nfl.import_seasonal_data(years=[get_this_year()])
-    player_info = nfl.import_players()
-    player_info.rename(columns={'gsis_id': 'player_id'}, inplace=True)
+    def get_player_season_stats(self, player_name: str, years: list):
+        
+        if len(years) == 0:
+            years = self.get_this_year()
+        
+        season_stats = nfl.import_seasonal_data(years=years)
+        player_info = nfl.import_players()
+        player_info = player_info[player_info['display_name'] == player_name]
+        result = season_stats[season_stats['player_id']
+                                == player_info['gsis_id'].tolist()[0]]
+        result.insert(loc=1, column='player_name',
+                        value=[player_name]*len(result))
+        
+        return result.to_dict()
 
-    #list(player_info[player_info['status'] != 'RET']['display_name'])
-    players_df = player_info.query("status=='ACT' | status=='RES'")
+    def get_player_weekly_stats(self, player_name: str, years: list):
 
-    result = pd.merge(season_data, players_df[['player_id', 'display_name', 'status_short_description']], on = "player_id")
+        if len(years) == 0:
+            years = self.get_this_year()
 
-    column_to_move = result.pop("display_name")
-    result.insert(1, "display_name", column_to_move)
-    result = result.head(6)
+        result = nfl.import_weekly_data(years)
+        result.fillna(0.0, inplace=True)
 
-    final = {}
-    for _, row in result.iterrows():
-        data = row.copy()
-        headshot_url = get_player_headshot(row['display_name'], player_headshots)
-        data['headshot_url'] = headshot_url
-        final.update({
-            row['display_name']: data.to_dict()
-        })
+        return result.query(f"player_display_name=='{player_name}'").to_dict()
 
-    return final #{"Justin Fields": final.get("Justin Fields")}
+    def get_team_weekly(self, team_code: str, years: list):
+        
+        if len(years) == 0:
+            years = self.get_this_year()
 
-def get_all_current_player_cards(page_num: int = 0) -> dict:
-    player_headshots = nfl.import_weekly_rosters(years=[get_this_year()])[['player_name', 'headshot_url']]
-    player_info = nfl.import_players()
-    player_info.rename(columns={'gsis_id': 'player_id'}, inplace=True)
-    player_info = player_info[['player_id', 'display_name', 'status_short_description', 'status']]
+        result = nfl.import_weekly_data(years)
+        result.fillna(0.0, inplace=True)
+        return result.query(f"recent_team=='{team_code}'").to_dict()
 
-    #list(player_info[player_info['status'] != 'RET']['display_name'])
-    players_df = player_info.query("status=='ACT' | status=='RES'")
-    start_index = MAX_CARD_COUNT * page_num
-    last_index = start_index + MAX_CARD_COUNT if start_index else MAX_CARD_COUNT
-    players_df = players_df.iloc[start_index:last_index]
+    def get_all_current_players(self) -> dict:
+        season_data = nfl.import_seasonal_data(years=[self.get_this_year()])
+        player_info = nfl.import_players()
+        player_info.rename(columns={'gsis_id': 'player_id'}, inplace=True)
 
-    final = {}
-    for _, row in players_df.iterrows():
-        data = row.copy()
-        headshot_url = get_player_headshot(row['display_name'], player_headshots)
-        data['headshot_url'] = headshot_url
-        final.update({
-            row['display_name']: data.to_dict()
-        })
+        #list(player_info[player_info['status'] != 'RET']['display_name'])
+        players_df = player_info.query("status=='ACT' | status=='RES'")
 
-    return final
+        result = pd.merge(season_data, players_df[['player_id', 'display_name', 'status_short_description']], on = "player_id")
 
-def get_player_headshot(player_name: str, player_headshots):
-    player_info = player_headshots[player_headshots['player_name'] == player_name]
+        column_to_move = result.pop("display_name")
+        result.insert(1, "display_name", column_to_move)
+        result = result.head(6)
 
-    if player_info.empty:
-        return "https://a.espncdn.com/combiner/i?img=/games/lm-static/ffl/images/nomug.png&w=426&h=320&cb=1"
+        final = {}
+        for _, row in result.iterrows():
+            data = row.copy()
+            headshot_url = self.get_player_headshot(row['display_name'])
+            data['headshot_url'] = headshot_url
+            final.update({
+                row['display_name']: data.to_dict()
+            })
 
-    return list(player_info['headshot_url'])[-1]
+        return final #{"Justin Fields": final.get("Justin Fields")}
 
-def get_max_pages() -> int:
-    player_info = nfl.import_players()
-    player_info.rename(columns={'gsis_id': 'player_id'}, inplace=True)
-    player_info = player_info[['player_id', 'display_name', 'status_short_description', 'status']]
+    def get_all_current_player_cards_df(self) -> pd.DataFrame:
+        player_info = nfl.import_players()
+        player_info.rename(columns={'gsis_id': 'player_id'}, inplace=True)
+        player_info = player_info[['player_id', 'display_name', 'status_short_description', 'status']]
 
-    #list(player_info[player_info['status'] != 'RET']['display_name'])
-    players_df = player_info.query("status=='ACT' | status=='RES'")
-    return int(len(players_df['display_name'].unique().tolist()) / MAX_CARD_COUNT) + 2
+        #list(player_info[player_info['status'] != 'RET']['display_name'])
+        players_df = player_info.query("status=='ACT' | status=='RES'")
 
-@APP.errorhandler(400)
-def bad_request_error(error):
-    return jsonify({
-        "success": False,
-        "error": 400,
-        "message": "bad request"
-    }), 400
+        for index, row in players_df.iterrows():
+            headshot_url = self.get_player_headshot(row['display_name'])
+            players_df.loc[index, 'headshot_url'] = headshot_url
 
-@APP.errorhandler(404)
-def not_found(error):
-    return jsonify({
-        "success": False,
-        "error": 404,
-        "message": "resource not found"
-    }), 404
+        return players_df
 
-@APP.errorhandler(405)
-def method_not_allowed(error):
-    return jsonify({
-        'success': False,
-        'error': 405,
-        'message': 'method not allowed'
-    }), 405
+    def get_all_current_player_cards(self, page_num: int = 0) -> dict:
+        player_info = self.player_card_df
 
-@APP.errorhandler(422)
-def unprocessable(error):
-    return jsonify({
-        "success": False,
-        "error": 422,
-        "message": "unprocessable"
-    }), 422
+        #list(player_info[player_info['status'] != 'RET']['display_name'])
+        players_df = player_info.query("status=='ACT' | status=='RES'")
+        start_index = self.max_card_count * page_num
+        last_index = start_index + self.max_card_count if start_index else self.max_card_count
+        players_df = players_df.iloc[start_index:last_index]
 
-@APP.errorhandler(500)
-def internal_server_error(error):
-    return jsonify({
-        "success": False,
-        "error": 500,
-        "message": "internal server error"
-    }), 422
+        final = {}
+        for _, row in players_df.iterrows():
+            data = row.copy()
+            final.update({
+                row['display_name']: data.to_dict()
+            })
+
+        return final
+
+    def get_player_headshot(self, player_name: str):
+        player_info = self.player_headshots[self.player_headshots['player_name'] == player_name]
+
+        if player_info.empty:
+            return "https://a.espncdn.com/combiner/i?img=/games/lm-static/ffl/images/nomug.png&w=426&h=320&cb=1"
+
+        return list(player_info['headshot_url'])[-1]
+
+    def get_max_pages(self) -> int:
+        player_info = nfl.import_players()
+        player_info.rename(columns={'gsis_id': 'player_id'}, inplace=True)
+        player_info = player_info[['player_id', 'display_name', 'status_short_description', 'status']]
+
+        #list(player_info[player_info['status'] != 'RET']['display_name'])
+        players_df = player_info.query("status=='ACT' | status=='RES'")
+        return int(len(players_df['display_name'].unique().tolist()) / self.max_card_count) + 2
 
 # Running app
 if __name__ == '__main__':
+    APP = RestAPI(__name__)
     APP.run(debug=True)

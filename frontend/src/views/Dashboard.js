@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect  } from "react";
 import { Button, Alert } from "reactstrap";
 import { useAuth0, withAuthenticationRequired } from "@auth0/auth0-react";
 import { getConfig } from "../config";
 import Loading from "../components/Loading";
 import Card from "../components/Card";
 
-export const ExternalApiComponent = () => {
+export const DashboardComponent = () => {
   const { apiOrigin = "http://127.0.0.1:5000", audience } = getConfig();
 
   const [state, setState] = useState({
@@ -13,6 +13,11 @@ export const ExternalApiComponent = () => {
     apiMessage: "",
     error: null,
   });
+
+  useEffect(() => {
+    // Call your function here
+    callApi();
+  }, []);
 
   const {
     getAccessTokenSilently,
@@ -56,12 +61,13 @@ export const ExternalApiComponent = () => {
 
   const callApi = async () => {
     console.log("PRESSED DA BUTTON")
+    let random_page_num = Math.floor(Math.random() * 324) + 1;
 
     try {
       const token = await getAccessTokenSilently();
 
       const response = await fetch(
-        `${apiOrigin}/api/players/cards?page_num=1`,
+        `${apiOrigin}/api/players/cards?page_num=${random_page_num}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -193,6 +199,6 @@ export const ExternalApiComponent = () => {
   );
 };
 
-export default withAuthenticationRequired(ExternalApiComponent, {
+export default withAuthenticationRequired(DashboardComponent, {
   onRedirecting: () => <Loading />,
 });
