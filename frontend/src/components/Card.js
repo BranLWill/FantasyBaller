@@ -5,13 +5,16 @@ import { Link } from 'react-router-dom';
 class Card extends React.Component {
   render() {
     const { name, headshot } = this.props;
-    const data = {'name': name}
+    const data = {
+      'name': name,
+      'headshot_url': headshot
+    }
 
     return (
-      <div className="card" style={{ width: "31%", height: "400px", background: "white" }}>
+      <div className="card" style={{ width: "18%", height: "300px", background: "white" }}>
         <img src={headshot} alt={"Missing Image"}/>
         <div className="card-body">
-          <h2>{name}</h2>
+          <h5>{name}</h5>
           <Button
             color="primary"
             className="m-2"
@@ -22,7 +25,7 @@ class Card extends React.Component {
           </Button>
           <Button
             color="secondary"
-            className="m-2"
+            className="m-1"
             // onClick={callApi}
             // disabled={!audience}
           >

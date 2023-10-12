@@ -9,18 +9,17 @@ export default class PlayerView extends Component {
         }
     }
 
-    alertMessage(){
-       console.log(this.props.location.state.name);
-    }
-
     render() {
         return (
 
             <>
-                {/* the below is the id we are accessing */}
-                <h1>{this.props.location.state.name}</h1>
+                <div className="card" style={{ width: "20%", height: "275px", background: "white" }}>
+                    <img src={this.props.location.state.headshot_url} alt={"Missing Image"}/>
+                    <div className="card-body">
+                        <h3>{this.props.location.state.name}</h3>
+                    </div>
+                </div>
             </>
-
         )
     }
 };

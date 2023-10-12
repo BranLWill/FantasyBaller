@@ -10,7 +10,9 @@ export const DashboardComponent = () => {
 
   const [state, setState] = useState({
     showResult: false,
-    apiMessage: "",
+    playerData: "",
+    totalPages: 0,
+    currentPage: 1,
     error: null,
   });
 
@@ -59,15 +61,15 @@ export const DashboardComponent = () => {
     await callApi();
   };
 
-  const callApi = async () => {
-    console.log("PRESSED DA BUTTON")
-    let random_page_num = Math.floor(Math.random() * 324) + 1;
-
+  const changePage = async event => {
     try {
+      const { target } = event
+      event.stopPropagation();
+
       const token = await getAccessTokenSilently();
 
       const response = await fetch(
-        `${apiOrigin}/api/players/cards?page_num=${random_page_num}`,
+        `${apiOrigin}/api/players/cards?page_num=${parseInt(target.innerText) + 1}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -75,14 +77,52 @@ export const DashboardComponent = () => {
         }
       );
 
-      console.log(response.ok)
-      const responseData = await response.json();
-      console.log(responseData)
+      const playerData = await response.json();
 
       setState({
         ...state,
         showResult: true,
-        apiMessage: responseData,
+        playerData: playerData,
+        currentPage: parseInt(target.innerText),
+      });
+    } catch (error) {
+      setState({
+        ...state,
+        error: error.error,
+      });
+    }
+  };
+
+  const callApi = async () => {
+    try {
+      const token = await getAccessTokenSilently();
+
+      const metaResponse = await fetch(
+        `${apiOrigin}/api/metadata/totalPages`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      const response = await fetch(
+        `${apiOrigin}/api/players/cards?page_num=${state.currentPage}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const totalPages = Object.values(await metaResponse.json());
+      const playerData = await response.json();
+
+      setState({
+        ...state,
+        showResult: true,
+        playerData: playerData,
+        totalPages: totalPages,
+        currentPage: state.currentPage,
       });
     } catch (error) {
       setState({
@@ -173,19 +213,25 @@ export const DashboardComponent = () => {
             </p>
           </Alert>
         )}
+      </div>
 
-        <Button
-          color="primary"
-          className="mt-5"
-          onClick={callApi}
-          disabled={!audience}
-        >
-          Get Cards
-        </Button>
+      <div className="pagination-area" style={{ display: "flex", flexWrap: "wrap" }}>
+        {Array.from(Array(parseInt(state.totalPages)), (e, i) => {
+          return (
+            <Button
+              color="primary"
+              className="m-1"
+              onClick={changePage}
+              disabled={!audience}
+            >
+              {i}
+            </Button>
+          );
+        })}
       </div>
 
       <div className="card-area" style={{ display: "flex", flexWrap: "wrap", gap: "25px", paddingTop: "50px", paddingRight: "50px", paddingBottom: "50px", paddingLeft: "50px" }}>
-        {Object.entries(state.apiMessage).map(([key, value]) => {
+        {Object.entries(state.playerData).map(([key, value]) => {
           return (
             <Card
               name={value.display_name}

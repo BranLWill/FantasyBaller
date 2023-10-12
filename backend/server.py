@@ -31,7 +31,7 @@ class RestAPI(object):
     app = None
 
     def __init__(self, name):
-        self.max_card_count = 9
+        self.max_card_count = 25
         self.current_time = datetime.datetime.now()
         self.player_headshots = nfl.import_weekly_rosters(years=[self.get_this_year()])[['player_name', 'headshot_url']]
         self.player_card_df = self.get_all_current_player_cards_df()
@@ -68,6 +68,11 @@ class RestAPI(object):
             endpoint='/api/images/logo',
             endpoint_name='get_logo',
             handler=self.get_logo
+        )
+        self.add_endpoint(
+            endpoint='/api/metadata/totalPages',
+            endpoint_name='get_total_pages',
+            handler=self.get_total_pages
         )
 
     def run(self, **kwargs):
@@ -192,6 +197,13 @@ class RestAPI(object):
         except:
             abort(400)
 
+    @require_auth(None)
+    def get_total_pages(self) -> dict:
+        try:
+            return {'totalPages': self.get_max_pages()}
+        except:
+            abort(400)
+
     def get_all_years(self) -> list:
         results = []
         for i in range(1999, self.get_this_year() + 1):
@@ -300,7 +312,7 @@ class RestAPI(object):
             return "https://a.espncdn.com/combiner/i?img=/games/lm-static/ffl/images/nomug.png&w=426&h=320&cb=1"
 
         return list(player_info['headshot_url'])[-1]
-
+    
     def get_max_pages(self) -> int:
         player_info = nfl.import_players()
         player_info.rename(columns={'gsis_id': 'player_id'}, inplace=True)
