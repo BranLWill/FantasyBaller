@@ -104,6 +104,14 @@ If you have found a bug or if you have a feature request, please report them at 
 
 This project is licensed under the MIT license. See the [LICENSE](../LICENSE) file for more info.
 
+## To Run the app
+
+Running the app - `docker compose up`
+Building the app - `docker compose build`
+Stop the app - `docker compose down`
+
+NOTE: It does take a good minute for the flask rest api to start up.
+
 ## TASKS
 
 - Models will include at least…

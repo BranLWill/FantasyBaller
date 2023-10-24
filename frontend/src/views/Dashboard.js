@@ -236,7 +236,6 @@ export const DashboardComponent = () => {
             <Card
               name={value.display_name}
               headshot={value.headshot_url}
-              // borderColor={"red"}
             />
           );
         })}

@@ -1,5 +1,6 @@
 """Python Flask API Auth0 integration example
 """
+import os
 import datetime
 import pandas as pd
 import nfl_data_py as nfl
@@ -37,7 +38,7 @@ class RestAPI(object):
         self.player_card_df = self.get_all_current_player_cards_df()
 
         self.app = Flask(name)
-        CORS(self.app, resources={r"/*": {"origins": "http://localhost:3000"}})
+        CORS(self.app, resources={r"/*": {"origins": os.getenv('APP_ORIGIN')}})
 
         self.add_endpoint(
             endpoint='/api/teams/<string:team_code>',
@@ -325,4 +326,4 @@ class RestAPI(object):
 # Running app
 if __name__ == '__main__':
     APP = RestAPI(__name__)
-    APP.run(debug=True)
+    APP.run(host='0.0.0.0', port=os.getenv('PORT'), debug=True)

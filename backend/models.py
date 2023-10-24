@@ -1,9 +1,9 @@
 import os
-from sqlalchemy import Column, String, Integer, Boolean, create_engine
+
+from sqlalchemy import Column, String, Integer, Boolean
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 from flask_sqlalchemy import SQLAlchemy
-import json
 
 DB_HOST = os.getenv('DB_HOST', 'localhost:5432')
 DB_USER = os.getenv('DB_USER', 'student')
@@ -64,30 +64,17 @@ class User(db.Model):
 
     def format(self):
         return {
-            'id': self.id,
-            'question': self.question,
-            'answer': self.answer,
-            'category': self.category,
-            'difficulty': self.difficulty
-            }
-    
-
-"""
-Player
-
-"""
-class Player(db.Model):
-    __tablename__ = 'players'
-
-    id = Column(Integer, primary_key=True)
-    type = Column(String)
-
-    def __init__(self, type):
-        self.type = type
-
-    def format(self):
-        return {
-            'id': self.id,
-            'type': self.type
+            "id": self.id,
+            "given_name": self.given_name,
+            "family_name": self.family_name,
+            "nickname": self.nickname,
+            "name": self.name,
+            "picture": self.picture,
+            "locale": self.locale,
+            "updated_at": self.updated_at,
+            "email": self.email,
+            "email_verified": self.email_verified,
+            "sub": self.sub,
+            "Favorite_players": self.Favorite_players
             }
     
