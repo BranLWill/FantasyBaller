@@ -1,0 +1,14 @@
+version: '3'
+services:
+  api-service:
+    build: ./backend/
+    ports: 
+      - 5000:5000
+    environment: 
+      PORT: 5000
+      APP_ORIGIN: http://localhost:3000
+      FLASK_DEBUG: 1
+  web:
+    build: ./frontend
+    ports:
+      - 3000:3000

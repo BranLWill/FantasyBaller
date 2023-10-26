@@ -1,18 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect  } from "react";
 import { Button, Alert } from "reactstrap";
-import Highlight from "../components/Highlight";
 import { useAuth0, withAuthenticationRequired } from "@auth0/auth0-react";
 import { getConfig } from "../config";
 import Loading from "../components/Loading";
+import Card from "../components/Card";
 
-export const ExternalApiComponent = () => {
-  const { apiOrigin = "http://localhost:3001", audience } = getConfig();
+export const DashboardComponent = () => {
+  const { apiOrigin = "http://127.0.0.1:5000", audience } = getConfig();
 
   const [state, setState] = useState({
     showResult: false,
-    apiMessage: "",
+    playerData: "",
+    totalPages: 0,
+    currentPage: 1,
     error: null,
   });
+
+  useEffect(() => {
+    // Call your function here
+    callApi();
+  }, []);
 
   const {
     getAccessTokenSilently,
@@ -54,22 +61,68 @@ export const ExternalApiComponent = () => {
     await callApi();
   };
 
-  const callApi = async () => {
+  const changePage = async event => {
     try {
+      const { target } = event
+      event.stopPropagation();
+
       const token = await getAccessTokenSilently();
 
-      const response = await fetch(`${apiOrigin}/api/external`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${apiOrigin}/api/players/cards?page_num=${parseInt(target.innerText) + 1}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-      const responseData = await response.json();
+      const playerData = await response.json();
 
       setState({
         ...state,
         showResult: true,
-        apiMessage: responseData,
+        playerData: playerData,
+        currentPage: parseInt(target.innerText),
+      });
+    } catch (error) {
+      setState({
+        ...state,
+        error: error.error,
+      });
+    }
+  };
+
+  const callApi = async () => {
+    try {
+      const token = await getAccessTokenSilently();
+
+      const metaResponse = await fetch(
+        `${apiOrigin}/api/metadata/totalPages`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      const response = await fetch(
+        `${apiOrigin}/api/players/cards?page_num=${state.currentPage}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const totalPages = Object.values(await metaResponse.json());
+      const playerData = await response.json();
+
+      setState({
+        ...state,
+        showResult: true,
+        playerData: playerData,
+        totalPages: totalPages,
+        currentPage: state.currentPage,
       });
     } catch (error) {
       setState({
@@ -113,17 +166,7 @@ export const ExternalApiComponent = () => {
           </Alert>
         )}
 
-        <h1>External API</h1>
-        <p className="lead">
-          Ping an external API by clicking the button below.
-        </p>
-
-        <p>
-          This will call a local API on port 3001 that would have been started
-          if you run <code>npm run dev</code>. An access token is sent as part
-          of the request's `Authorization` header and the API will validate it
-          using the API's audience value.
-        </p>
+        <h1>Player Portal</h1>
 
         {!audience && (
           <Alert color="warning">
@@ -170,31 +213,37 @@ export const ExternalApiComponent = () => {
             </p>
           </Alert>
         )}
-
-        <Button
-          color="primary"
-          className="mt-5"
-          onClick={callApi}
-          disabled={!audience}
-        >
-          Ping API
-        </Button>
       </div>
 
-      <div className="result-block-container">
-        {state.showResult && (
-          <div className="result-block" data-testid="api-result">
-            <h6 className="muted">Result</h6>
-            <Highlight>
-              <span>{JSON.stringify(state.apiMessage, null, 2)}</span>
-            </Highlight>
-          </div>
-        )}
+      <div className="pagination-area" style={{ display: "flex", flexWrap: "wrap" }}>
+        {Array.from(Array(parseInt(state.totalPages)), (e, i) => {
+          return (
+            <Button
+              color="primary"
+              className="m-1"
+              onClick={changePage}
+              disabled={!audience}
+            >
+              {i}
+            </Button>
+          );
+        })}
+      </div>
+
+      <div className="card-area" style={{ display: "flex", flexWrap: "wrap", gap: "25px", paddingTop: "50px", paddingRight: "50px", paddingBottom: "50px", paddingLeft: "50px" }}>
+        {Object.entries(state.playerData).map(([key, value]) => {
+          return (
+            <Card
+              name={value.display_name}
+              headshot={value.headshot_url}
+            />
+          );
+        })}
       </div>
     </>
   );
 };
 
-export default withAuthenticationRequired(ExternalApiComponent, {
+export default withAuthenticationRequired(DashboardComponent, {
   onRedirecting: () => <Loading />,
 });
